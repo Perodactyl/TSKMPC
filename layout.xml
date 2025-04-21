@@ -1,0 +1,27 @@
+<ListContainer>
+	<ListContainer>
+		<ListContainer orientation="horizontal" justify="even">
+			<CoverImage>
+				<BorderContainer>
+					<CenterContainer>
+						<Text scale="2">[cover]</Text>
+					</CenterContainer>
+				</BorderContainer>
+			</CoverImage>
+			<MarginContainer marginLeft="1" marginBottom="1">
+				<ListContainer justify="end">
+					<SongData scale="2" key="Title" default="Unnamed Song" />
+					<SongData key="Artist" default="Unknown Artist" />
+					<SongData key="Album" default="No Album" />
+				</ListContainer>
+			</MarginContainer>
+		</ListContainer>
+		<ListContainer justify="begin">
+			<Text>Song A</Text>
+			<Text>Song B</Text>
+			<Text>Song C</Text>
+			<Text>Song D</Text>
+		</ListContainer>
+	</ListContainer>
+	<!-- <Text id="status" /> -->
+</ListContainer>
