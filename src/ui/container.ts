@@ -3,7 +3,6 @@ import { log, TSKMPC } from "../";
 import { goto, KittyImage, KittyImagePlacement } from "../kitty";
 import { parse, type Tag } from "vow-xamel";
 import { escapeString } from "../mpd";
-import { createWriteStream } from "node:fs";
 
 function tryParseInt(value: string): string | number {
 	try {
@@ -17,6 +16,9 @@ function tryParseInt(value: string): string | number {
 	}
 }
 
+/**
+* Containers can have children. In general, containers inherit the width they are given, while components define their own width.
+* */
 export class UIContainer extends UIComponent {
 	public static override name = "UIContainer";
 	[Symbol.toStringTag] = "UIContainer";
@@ -67,10 +69,10 @@ export class UIContainer extends UIComponent {
 	protected positionChild(child: UIComponent) {
 
 	}
-	override update() {
+	public override update() {
 		for(let child of this.children) child.update();
 	}
-	override draw() {
+	public override draw() {
 		for(let child of this.children) {
 			child.draw();
 		}
@@ -130,7 +132,7 @@ componentClasses.push(UIContainer);
 
 export class CenterContainer extends UIContainer {
 	public static override name = "CenterContainer";
-	override positionChild(child: UIComponent) {
+	protected override positionChild(child: UIComponent) {
 		let baseX = this.x + (this.width  / 2);
 		let baseY = this.y + (this.height / 2);
 		child.x = Math.floor(baseX - child.width  / 2);
@@ -159,49 +161,30 @@ export class MarginContainer extends UIContainer {
 }
 componentClasses.push(MarginContainer);
 
-///Fixes the size of children. Required for elements which do not specify their own size (specifically CoverImage) because in general, elements only ever get smaller.
-export class PaddingContainer extends UIContainer {
-	public static override name = "PaddingContainer";
+///Fixes the size of children.
+export class FixedContainer extends CenterContainer {
+	public static override name = "FixedContainer";
 	constructor(
 		application: TSKMPC,
-		public paddingH: number = 0,
-		public paddingV: number = 0
+		public targetWidth:  number = 0,
+		public targetHeight: number = 0
 	) {
 		super(application);
 	}
 	protected override positionChild(child: UIComponent) {
 		child.x = this.x;
 		child.y = this.y;
-		if(this.paddingH > 0)child.width = this.paddingH;
-		if(this.paddingV > 0)child.height = this.paddingV;
+		if(this.targetWidth > 0)child.width = this.targetWidth;
+		if(this.targetHeight > 0)child.height = this.targetHeight;
 	}
 	protected override onResize() {
-		if(this.paddingH > 0)this.width = this.paddingH;
-		if(this.paddingV > 0)this.height = this.paddingV;
+		if(this.targetWidth > 0)this.width = this.targetWidth;
+		if(this.targetHeight > 0)this.height = this.targetHeight;
+		super.onResize();
 	}
 }
-componentClasses.push(PaddingContainer);
+componentClasses.push(FixedContainer);
 
-export class AspectRatioContainer extends MarginContainer {
-	public static override name = "AspectRatioContainer";
-	public fixedDimension: "width" | "height" = "width";
-	public aspectX = 1;
-	public aspectY = 1;
-	override positionChild(child: UIComponent) {
-		let difference = (this.width / this.height) / (this.aspectX / this.aspectY);
-		if(this.fixedDimension == "width") {
-			this.marginTop = Math.floor(difference / 2 * this.width);
-			this.marginBottom = difference - this.marginTop;
-		} else if(this.fixedDimension == "height"){
-			this.marginLeft = Math.floor(difference);
-		} else {
-			throw new Error(`AspectRatioContainer.fixedDimension must be one of "width", "height". (Got "${this.fixedDimension}")`);
-		}
-		super.positionChild(child);
-	}
-}
-
-componentClasses.push(AspectRatioContainer);
 type BorderContainerStyle = "round" | "square" | "double" | "thick";
 const borders: Record<BorderContainerStyle, {tl:string,tr:string,bl:string,br:string,h:string,v:string}> = {
 	round: {
@@ -276,7 +259,7 @@ export class ListContainer extends UIContainer {
 	public static override name = "ListContainer";
 	public orientation: ListContainerOrientation = "vertical";
 	public justify: ListContainerJustify = "even";
-	positionChildren() {
+	protected override positionChildren() {
 		if(this.orientation == "vertical") {
 			if(this.justify == "even") {
 				let height = this.height / this.children.length;
@@ -335,16 +318,16 @@ export class ListContainer extends UIContainer {
 			throw new Error(`ListContainer.orientation must be one of "horizontal", "vertical". (Got "${this.orientation}")`);
 		}
 	}
-	override onChildAdded(child: UIComponent) {
+	protected override onChildAdded(child: UIComponent) {
 		this.positionChildren();
 	}
-	override onChildResized(child: UIComponent) {
+	protected override onChildResized(child: UIComponent) {
 		this.positionChildren();
 	}
 }
 componentClasses.push(ListContainer);
 
-export class CoverImageContainer extends UIContainer { //Only shows children if no image was found.
+export class CoverImageContainer extends FixedContainer { //Only shows children if no image was found.
 	public static override name = "CoverImage";
 	private imageData: Buffer = Buffer.alloc(0);
 	private image: KittyImage | null = null;
@@ -372,7 +355,7 @@ export class CoverImageContainer extends UIContainer { //Only shows children if 
 			super.draw();
 			return;
 		}
-		let p = new KittyImagePlacement(this.image);
+		let p = new KittyImagePlacement(this.image, 1);
 		p.cellX = this.x;
 		p.cellY = this.y;
 		p.cellWidth = this.width;

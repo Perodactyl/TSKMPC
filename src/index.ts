@@ -1,4 +1,4 @@
-import { MPDConnection } from "./mpd";
+import { MPDConnection, MPDResponse } from "./mpd";
 import { readFile, writeFile } from "node:fs/promises";
 import { createWriteStream } from "node:fs";
 import { inspect } from "node:util";
@@ -27,6 +27,7 @@ export class TSKMPC {
 	mpd: MPDConnection | null = null;
 	stdinHandler: TSKMPC["readStdin"] | null = null;
 	currentStatusTimeout: ReturnType<typeof setTimeout> | null = null;
+	intervals: ReturnType<typeof setInterval>[] = [];
 	isRedrawing:  boolean = false;
 	rootComponent = new UIContainer(this);
 	currentSongMetaData = new Map<string, string>();
@@ -49,8 +50,8 @@ export class TSKMPC {
 
 		this.status = "Welcome to TSKMPC!";
 		
-		await this.onNextSong();
-		await this.redraw();
+		await this.pollSongInfo();
+		this.intervals.push(setInterval(()=>this.pollSongInfo(), 1000));
 	}
 	async stop() {
 		process.stdout.uncork();
@@ -67,6 +68,7 @@ export class TSKMPC {
 			clearTimeout(this.currentStatusTimeout);
 			this.currentStatusTimeout = null;
 		}
+		for(let interval of this.intervals) clearInterval(interval);
 
 		log("TSKMPC exiting.");
 		logFile.end();
@@ -134,12 +136,19 @@ export class TSKMPC {
 			}
 		}
 	}
-	private async onNextSong() {
+	private async pollSongInfo() {
 		if(!this.mpd) throw new Error("MPD is not yet initialized.");
-		let info = await this.mpd.sendCommand("currentsong");
+		let response = await this.mpd.sendCommand("currentsong");
+		if(response.get("file") != this.currentSongMetaData.get("file")) {
+			await this.onNextSong(response);
+		}
+	}
+	private async onNextSong(info: MPDResponse) {
+		if(!this.mpd) throw new Error("MPD is not yet initialized.");
 		log(info);
 		this.currentSongMetaData = info.values;
 		await this.rootComponent.event("nextSong");
+		await this.redraw();
 	}
 	[inspect.custom]() {
 		return `<TSKMPC>`;
@@ -147,4 +156,8 @@ export class TSKMPC {
 }
 
 let tskmpc = new TSKMPC();
+process.once("uncaughtException", e=>{
+	tskmpc.stop();
+	throw e;
+});
 tskmpc.start();

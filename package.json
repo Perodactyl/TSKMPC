@@ -8,7 +8,6 @@
 		"typescript": "^5.0.0"
 	},
 	"dependencies": {
-		"dts-gen": "^0.10.4",
 		"image-decode": "^1.2.2",
 		"vow-xamel": "^0.0.4"
 	}

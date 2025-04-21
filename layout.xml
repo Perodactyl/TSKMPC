@@ -1,7 +1,7 @@
 <ListContainer>
 	<ListContainer>
-		<ListContainer orientation="horizontal" justify="even">
-			<CoverImage>
+		<ListContainer orientation="horizontal" justify="begin">
+			<CoverImage targetWidth="50">
 				<BorderContainer>
 					<CenterContainer>
 						<Text scale="2">[cover]</Text>
